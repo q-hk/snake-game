@@ -154,11 +154,70 @@
   .crown-label.active {
     color: #f39c12;
   }
+  #historyPanel {
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.92);
+    padding: 30px 40px;
+    border-radius: 10px;
+    border: 2px solid #4ecca3;
+    z-index: 20;
+    max-height: 80vh;
+    min-width: 320px;
+  }
+  #historyPanel h2 {
+    color: #4ecca3;
+    margin: 0 0 15px 0;
+  }
+  #historyList {
+    max-height: 300px;
+    overflow-y: auto;
+    width: 100%;
+    margin-bottom: 15px;
+  }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(78,204,163,0.2);
+    font-size: 14px;
+  }
+  .history-item:nth-child(odd) {
+    background: rgba(78,204,163,0.05);
+  }
+  .history-item .h-date { color: #aaa; }
+  .history-item .h-diff { color: #f39c12; }
+  .history-item .h-score { color: #4ecca3; font-weight: bold; }
+  .history-btns {
+    display: flex;
+    gap: 10px;
+  }
+  .history-btns button {
+    margin-top: 0;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  .btn-clear {
+    background: #e94560;
+    color: #eee;
+  }
+  .btn-clear:hover {
+    background: #d63851;
+  }
+  .no-history {
+    color: #666;
+    padding: 20px;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
   <button id="soundToggle" onclick="toggleSound()">🔊 音效开</button>
-  <h1>🐍 SNAKE GAME</h1>
+  <button id="historyToggle" onclick="showHistory()" style="position:absolute;top:15px;left:15px;padding:6px 12px;font-size:14px;background:transparent;border:2px solid #f39c12;color:#f39c12;margin-top:0;">📜 历史记录</button>
+  <h1> SNAKE GAME</h1>
   <div id="crowns">
     <div class="crown-wrapper">
       <div class="crown" id="crown1">👑</div>
@@ -189,6 +248,14 @@
     <div>Final Score: <span id="finalScore">0</span></div>
     <button onclick="restartGame()">重新选择难度</button>
   </div>
+  <div id="historyPanel">
+    <h2>📜 历史记录</h2>
+    <div id="historyList"></div>
+    <div class="history-btns">
+      <button onclick="closeHistory()">关闭</button>
+      <button class="btn-clear" onclick="clearHistory()">清空记录</button>
+    </div>
+  </div>
   <div id="controls">
     Use Arrow Keys or WASD to move<br>
     Press Space to pause/resume
@@ -202,6 +269,11 @@ const gameOverEl = document.getElementById('gameOver');
 const finalScoreEl = document.getElementById('finalScore');
 const difficultyPanel = document.getElementById('difficultyPanel');
 const currentDiffEl = document.getElementById('currentDiff');
+const historyPanel = document.getElementById('historyPanel');
+const historyList = document.getElementById('historyList');
+
+const HISTORY_KEY = 'snake_game_history';
+const MAX_HISTORY = 50;
 
 const gridSize = 20;
 const tileCount = canvas.width / gridSize;
@@ -489,6 +561,7 @@ function endGame() {
   finalScoreEl.textContent = score;
   gameOverEl.style.display = 'flex';
   playGameOverSound();
+  saveToHistory(score, currentDiff);
 }
 
 function gameStep() {
@@ -505,6 +578,62 @@ function restartGame() {
   clearInterval(gameLoop);
   init();
   draw();
+}
+
+function getHistory() {
+  try {
+    const data = localStorage.getItem(HISTORY_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveToHistory(score, diff) {
+  const history = getHistory();
+  const now = new Date();
+  const entry = {
+    date: now.toLocaleDateString('zh-CN') + ' ' + now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    score: score,
+    difficulty: DIFFICULTY_NAMES[diff] || diff
+  };
+  history.unshift(entry);
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function showHistory() {
+  initAudio();
+  playButtonSound();
+  const history = getHistory();
+  historyPanel.style.display = 'flex';
+  if (history.length === 0) {
+    historyList.innerHTML = '<div class="no-history">暂无记录，快去玩一局吧！</div>';
+  } else {
+    let html = '';
+    history.forEach((item, index) => {
+      html += '<div class="history-item">' +
+        '<span class="h-date">' + item.date + '</span>' +
+        '<span class="h-diff">' + item.difficulty + '</span>' +
+        '<span class="h-score">' + item.score + '分</span>' +
+        '</div>';
+    });
+    historyList.innerHTML = html;
+  }
+}
+
+function closeHistory() {
+  playButtonSound();
+  historyPanel.style.display = 'none';
+}
+
+function clearHistory() {
+  playButtonSound();
+  localStorage.removeItem(HISTORY_KEY);
+  historyList.innerHTML = '<div class="no-history">记录已清空</div>';
+  setTimeout(() => {
+    historyPanel.style.display = 'none';
+  }, 800);
 }
 
 document.addEventListener('keydown', e => {
